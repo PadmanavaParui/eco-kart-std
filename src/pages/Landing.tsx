@@ -1,6 +1,7 @@
 import { Navbar } from '../components/Navbar';
 import { Hero } from '../components/landing/Hero';
 import { LiveMarket } from '../components/landing/LiveMarket';
+import { RecyclingTransformationStage } from '../components/landing/RecyclingTransformationStage';
 import { Stats } from '../components/landing/Stats';
 import { HowItWorks } from '../components/landing/HowItWorks';
 import { MaterialsExplorer } from '../components/landing/MaterialsExplorer';
@@ -18,6 +19,7 @@ export function ProductLanding() {
       <main id="main">
         <Hero />
         <LiveMarket />
+        <RecyclingTransformationStage />
         <Stats />
         <HowItWorks />
         <MaterialsExplorer />
