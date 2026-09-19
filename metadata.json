@@ -1,0 +1,10 @@
+{
+  "name": "EcoKart",
+  "description": "SmartSort — every object has a next life. Photograph waste, let AI identify the material, and discover nearby recycling facilities ranked by distance, value and trust.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
