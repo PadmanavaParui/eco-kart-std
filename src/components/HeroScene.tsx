@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { createSodaCanTextures } from './BackgroundRecycledCanScene';
 
 /**
  * WasteX / SmartSort 3D Hero Scene:
@@ -14,7 +15,7 @@ import * as THREE from 'three';
 // 1. Procedural 3D Soda Can (Crumpled Can -> Recycled Aluminum Ingot)
 // -------------------------------------------------------------
 function SodaCan({
-  position = [0.1, 0.18, 0.4] as [number, number, number],
+  position = [0, 0.05, 0.2] as [number, number, number],
   recycleProgress = 0,
 }: {
   position?: [number, number, number];
@@ -24,17 +25,23 @@ function SodaCan({
   const bodyMeshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
 
-  // Original undeformed cylinder vertices
-  const { originalPos, canMat } = useMemo(() => {
-    const geo = new THREE.CylinderGeometry(0.58, 0.58, 1.5, 36, 32, false);
+  // Original undeformed cylinder vertices with realistic Sketchfab soda can textures
+  const { originalPos, canMat, metalMat } = useMemo(() => {
+    const geo = new THREE.CylinderGeometry(0.52, 0.52, 1.45, 48, 40, false);
     const posAttr = geo.getAttribute('position') as THREE.BufferAttribute;
     const pos = posAttr.clone();
+    const tex = createSodaCanTextures();
     const mat = new THREE.MeshStandardMaterial({
-      color: '#ef4444',
+      map: tex,
       metalness: 0.85,
       roughness: 0.35,
     });
-    return { originalPos: pos, canMat: mat };
+    const mMat = new THREE.MeshStandardMaterial({
+      color: '#cbd5e1',
+      metalness: 0.95,
+      roughness: 0.22,
+    });
+    return { originalPos: pos, canMat: mat, metalMat: mMat };
   }, []);
 
   useFrame(({ clock }) => {
@@ -53,7 +60,7 @@ function SodaCan({
       const pos = geo.getAttribute('position') as THREE.BufferAttribute | undefined;
       if (pos) {
         const count = pos.count;
-        const dentAmt = (1 - recycleProgress) * 0.24;
+        const dentAmt = (1 - recycleProgress) * 0.3;
 
         for (let i = 0; i < count; i++) {
           const ox = originalPos.getX(i);
@@ -61,13 +68,14 @@ function SodaCan({
           const oz = originalPos.getZ(i);
 
           // Procedural crushing crease and indent
-          const dent = Math.sin(oy * 6.0 + ox * 4.5) * Math.cos(oz * 5.0) * dentAmt;
-          const middleCrush = Math.exp(-Math.abs(oy) * 2.8) * (1 - recycleProgress) * 0.15;
+          const dent = Math.sin(oy * 5.0 + ox * 4.2 + oz * 3.0) * dentAmt * 0.75;
+          const middleCrush = Math.exp(-Math.abs(oy) * 2.8) * (1 - recycleProgress) * 0.2;
+          const stomp = ox > 0 ? -Math.exp(-((ox - 0.5) ** 2 + oy ** 2 * 2.0)) * 0.35 * (1 - recycleProgress) : 0;
 
           pos.setXYZ(
             i,
-            ox * (1 - middleCrush) + ox * dent,
-            oy * (1 - dentAmt * 0.15),
+            ox * (1 - middleCrush) + ox * dent + stomp,
+            oy * (1 - dentAmt * 0.14),
             oz * (1 - middleCrush) + oz * dent
           );
         }
@@ -77,13 +85,15 @@ function SodaCan({
 
       // Dynamic color shift: weathered scratched beverage red -> brilliant recycled emerald & alloy chrome
       const p = recycleProgress;
-      canMat.color.setRGB(
-        THREE.MathUtils.lerp(0.88, 0.20, p),
-        THREE.MathUtils.lerp(0.22, 0.88, p),
-        THREE.MathUtils.lerp(0.25, 0.48, p)
-      );
-      canMat.metalness = THREE.MathUtils.lerp(0.7, 0.96, p);
-      canMat.roughness = THREE.MathUtils.lerp(0.5, 0.12, p);
+      canMat.metalness = THREE.MathUtils.lerp(0.85, 0.98, p);
+      canMat.roughness = THREE.MathUtils.lerp(0.35, 0.1, p);
+      if (p > 0.4) {
+        canMat.color.setRGB(
+          THREE.MathUtils.lerp(1.0, 0.22, (p - 0.4) * 1.66),
+          THREE.MathUtils.lerp(0.9, 0.92, (p - 0.4) * 1.66),
+          THREE.MathUtils.lerp(0.9, 0.55, (p - 0.4) * 1.66)
+        );
+      }
     }
   });
 
@@ -91,29 +101,32 @@ function SodaCan({
     <group
       ref={groupRef}
       position={position}
-      scale={hovered ? 1.45 : 1.35}
+      scale={hovered ? 1.25 : 1.15}
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
     >
       <mesh ref={bodyMeshRef} material={canMat}>
-        <cylinderGeometry args={[0.58, 0.58, 1.5, 36, 32, false]} />
+        <cylinderGeometry args={[0.52, 0.52, 1.45, 48, 40, false]} />
       </mesh>
 
       {/* Top Rim */}
-      <mesh position={[0, 0.76, 0]}>
-        <cylinderGeometry args={[0.5, 0.56, 0.05, 32]} />
-        <meshStandardMaterial color="#cbd5e1" metalness={0.92} roughness={0.2} />
+      <mesh position={[0, 0.75, 0]} material={metalMat}>
+        <cylinderGeometry args={[0.44, 0.51, 0.05, 36]} />
       </mesh>
       {/* Pull Tab */}
-      <mesh position={[0.1, 0.79, 0]} rotation={[-0.2, 0.4, 0]}>
-        <boxGeometry args={[0.22, 0.02, 0.12]} />
-        <meshStandardMaterial color="#94a3b8" metalness={0.9} roughness={0.25} />
+      <mesh position={[0.1, 0.78, 0]} rotation={[-0.2, 0.35, 0]} material={metalMat}>
+        <boxGeometry args={[0.2, 0.02, 0.12]} />
+      </mesh>
+
+      {/* Bottom Dome */}
+      <mesh position={[0, -0.75, 0]} material={metalMat}>
+        <cylinderGeometry args={[0.51, 0.44, 0.05, 36]} />
       </mesh>
 
       {/* Recycled Energy Halo */}
       {recycleProgress > 0.35 && (
         <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.72, 0.84, 32]} />
+          <ringGeometry args={[0.7, 0.8, 32]} />
           <meshBasicMaterial
             color="#34e27a"
             transparent

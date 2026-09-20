@@ -2,6 +2,7 @@ import { Suspense, useMemo, useRef, useState, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Rotate3D, Sparkles, Sliders, CheckCircle2 } from 'lucide-react';
+import { createSodaCanTextures } from '../BackgroundRecycledCanScene';
 
 /**
  * Procedural Realistic 3D Aluminum Can:
@@ -28,16 +29,22 @@ export function MorphingSodaCan({
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
 
-  const { originalPos, canMat } = useMemo(() => {
-    const geo = new THREE.CylinderGeometry(0.55, 0.55, 1.45, 36, 32, false);
+  const { originalPos, canMat, metalMat } = useMemo(() => {
+    const geo = new THREE.CylinderGeometry(0.65, 0.65, 1.7, 48, 40, false);
     const posAttr = geo.getAttribute('position') as THREE.BufferAttribute;
     const pos = posAttr.clone();
+    const tex = createSodaCanTextures();
     const mat = new THREE.MeshStandardMaterial({
-      color: '#ef4444',
-      metalness: 0.82,
-      roughness: 0.38,
+      map: tex,
+      metalness: 0.85,
+      roughness: 0.35,
     });
-    return { originalPos: pos, canMat: mat };
+    const mMat = new THREE.MeshStandardMaterial({
+      color: '#cbd5e1',
+      metalness: 0.95,
+      roughness: 0.2,
+    });
+    return { originalPos: pos, canMat: mat, metalMat: mMat };
   }, []);
 
   useFrame(({ clock }) => {
@@ -56,21 +63,22 @@ export function MorphingSodaCan({
       if (pos) {
         const count = pos.count;
         // As recycleProgress increases, dents vanish!
-        const dentAmt = (1 - recycleProgress) * 0.28;
+        const dentAmt = (1 - recycleProgress) * 0.32;
 
         for (let i = 0; i < count; i++) {
           const ox = originalPos.getX(i);
           const oy = originalPos.getY(i);
           const oz = originalPos.getZ(i);
 
-          // Realistic asymmetric lateral stomp / buckle crease in middle of can
-          const buckle = Math.sin(oy * 5.5 + ox * 4.2) * Math.cos(oz * 4.8) * dentAmt;
-          const waistPinch = Math.exp(-Math.abs(oy) * 3.2) * (1 - recycleProgress) * 0.18;
+          // Realistic asymmetric lateral stomp / buckle crease in middle of can (Sketchfab inspired)
+          const buckle = Math.sin(oy * 5.0 + ox * 4.2 + oz * 3.0) * dentAmt * 0.8;
+          const waistPinch = Math.exp(-Math.abs(oy) * 2.8) * (1 - recycleProgress) * 0.22;
+          const stompDent = ox > 0 ? -Math.exp(-((ox - 0.5) ** 2 + oy ** 2 * 2.0)) * 0.35 * (1 - recycleProgress) : 0;
 
           pos.setXYZ(
             i,
-            ox * (1 - waistPinch) + ox * buckle,
-            oy * (1 - dentAmt * 0.12),
+            ox * (1 - waistPinch) + ox * buckle + stompDent,
+            oy * (1 - dentAmt * 0.14),
             oz * (1 - waistPinch) + oz * buckle
           );
         }
@@ -80,13 +88,15 @@ export function MorphingSodaCan({
 
       // Material transition: Discarded red beverage can -> Recycled pure aluminum / eco-emerald sheen
       const p = recycleProgress;
-      canMat.color.setRGB(
-        THREE.MathUtils.lerp(0.9, 0.2, p),
-        THREE.MathUtils.lerp(0.24, 0.88, p),
-        THREE.MathUtils.lerp(0.26, 0.5, p)
-      );
-      canMat.metalness = THREE.MathUtils.lerp(0.72, 0.98, p);
-      canMat.roughness = THREE.MathUtils.lerp(0.48, 0.12, p);
+      canMat.metalness = THREE.MathUtils.lerp(0.85, 0.98, p);
+      canMat.roughness = THREE.MathUtils.lerp(0.35, 0.1, p);
+      if (p > 0.4) {
+        canMat.color.setRGB(
+          THREE.MathUtils.lerp(1.0, 0.22, (p - 0.4) * 1.66),
+          THREE.MathUtils.lerp(0.9, 0.92, (p - 0.4) * 1.66),
+          THREE.MathUtils.lerp(0.9, 0.55, (p - 0.4) * 1.66)
+        );
+      }
     }
   });
 
@@ -99,18 +109,21 @@ export function MorphingSodaCan({
       onPointerOut={() => interactive && setHovered(false)}
     >
       <mesh ref={meshRef} material={canMat}>
-        <cylinderGeometry args={[0.55, 0.55, 1.45, 36, 32, false]} />
+        <cylinderGeometry args={[0.65, 0.65, 1.7, 48, 40, false]} />
       </mesh>
 
       {/* Top Rim */}
-      <mesh position={[0, 0.74, 0]}>
-        <cylinderGeometry args={[0.48, 0.53, 0.05, 32]} />
-        <meshStandardMaterial color="#cbd5e1" metalness={0.92} roughness={0.2} />
+      <mesh position={[0, 0.88, 0]} material={metalMat}>
+        <cylinderGeometry args={[0.55, 0.64, 0.06, 36]} />
       </mesh>
       {/* Pull Tab */}
-      <mesh position={[0.1, 0.77, 0]} rotation={[-0.2, 0.35, 0]}>
-        <boxGeometry args={[0.2, 0.02, 0.12]} />
-        <meshStandardMaterial color="#94a3b8" metalness={0.9} roughness={0.25} />
+      <mesh position={[0.12, 0.92, 0]} rotation={[-0.2, 0.35, 0]} material={metalMat}>
+        <boxGeometry args={[0.24, 0.02, 0.14]} />
+      </mesh>
+
+      {/* Bottom Dome */}
+      <mesh position={[0, -0.88, 0]} material={metalMat}>
+        <cylinderGeometry args={[0.64, 0.56, 0.06, 36]} />
       </mesh>
 
       {/* Induction / Laser Sorting Ring (Appears when recycling) */}
